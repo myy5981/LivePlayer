@@ -1,0 +1,75 @@
+# LivePlayer | 支持同步进度的视频播放器
+
+---
+
+本项目的定位是，当多人需要观看同一个视频时，提供多人进度同步的功能。
+
+要求每个观众本地存在相同的视频文件，项目中使用hash强制校验，如果不同会报出警告，但理论上，只要视频时长相同，也是可以用的。
+
+### 关于同步服务器
+
+---
+
+既然是多人同步，那必须要有一个大伙都能访问的服务器。
+
+代码位于`srv/`中使用Python+websockets库实现，使用websocket协议通信。服务器请自备，在界面中填写ip+port即可。
+
+### 关于弹幕服务器
+
+---
+
+项目前端基于DPlayer库，在发送弹幕时，DPlayer库中会发起xhr请求，请求默认会发送到地址`/danmaku_api/v3`，但这个地址默认情况下是没有东西的。
+
+解决方案：
+
+1. 我不需要持久化弹幕
+   
+    1.1 我能忍受报错的存在
+    那不管就可以，此时你发送的弹幕在你自己界面上不可见，但对方是实时可见的。
+
+    1.2 我不能忍受这一错误
+    别怪我啊，我又没有公网服务器。但是你可以本地配置一个nginx代理，写下如下配置：
+    ```conf
+    server {
+        listen       80;
+        server_name  localhost;
+
+        location ~ ^/danmaku_api/v3 {
+            default_type application/json;
+            return 200 '{"code": 0, "data": []}';
+        }
+        
+        location / {
+            root   path_to_LivePlayer;
+            index  index.html;
+            add_header Cache-Control no-store;
+        }
+    }
+
+    ```
+    如此一来，所有的弹幕发送与加载请求都能够正常响应，也就不会报错了。
+
+2. 我需要持久化弹幕
+   
+   请自备弹幕服务器，实现`base_url`+`/v3`路径下的GET和Post请求。
+   
+   随后修改`index.js`文件中`new DPlayer`处的相关配置（搜索`/danmaku_api/`替换之）。
+
+## 关于仅支持本地视频文件播放
+推荐[SyncTV](https://github.com/synctv-org/synctv)
+
+## 关于安全性
+弹幕里可别什么都乱说，明文的
+
+有需要自行配置https和wss吧
+
+## 关于权限认证
+没有，自行添加鉴权网关
+
+## 最后
+总之项目诸多不完善，包括但不限于以上几点以及：
+
+· 没有考虑多方几乎同时进行操作造成的同步混乱问题
+· ……
+
+欢迎添砖Java

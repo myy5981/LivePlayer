@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LivePlayer</title>
+    <link rel="stylesheet" href="index.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/dplayer/dist/DPlayer.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css">
+</head>
+<body>
+    <div id="login">
+        <div>
+            <input style="margin-right: 10px;" class="input-box" type="text" name="room-id" id="room-id" placeholder="房间代码"/>
+            <input style="margin-right: 10px;margin-left: 10px;" class="input-box" type="password" name="room-pwd" id="room-pwd" placeholder="房间密码"/>
+            <input style="margin-left: 10px;" class="input-box" type="text" name="room_srv" id="room-srv" placeholder="同步服务器地址（ip:port）"/>
+        </div>
+        <div>
+            <div id="file-upload-area">
+                <div id="file-upload">
+                    <i class="fa fa-upload"></i>
+                    <h3>选择本地视频文件</h3>
+                    <p>点击或拖放视频文件到此处 (MP4, WebM, Ogg)</p>
+                    <input type="file" id="file-input" accept="video/*" style="display: none;">
+                </div>
+                <div id="file-name" style="display: none;">
+                    <i class="fa fa-spinner"></i>
+                </div>
+            </div>
+        </div>
+        <div>
+            <button class="btn" id="enter-btn">
+                <i class="fa fa-film"></i>进入房间
+            </button>
+        </div>
+    </div>
+    <div id="video-container"></div>
+</body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dplayer/dist/DPlayer.min.js"></script>
+<script src="index.js"></script>
+<script>
+        // 文件选择处理
+        fileUpload.addEventListener('click', () => {
+            fileInput.click();
+        });
+        
+        fileUpload.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileUpload.style.borderColor = '#ff4d94';
+            fileUpload.style.background = 'rgba(255, 255, 255, 0.1)';
+        });
+        
+        fileUpload.addEventListener('dragleave', () => {
+            fileUpload.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+            fileUpload.style.background = 'transparent';
+        });
+        
+        fileUpload.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            fileUpload.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+            fileUpload.style.background = 'transparent';
+            
+            if (e.dataTransfer.files.length) {
+                await handleVideoFile(e.dataTransfer.files[0]);
+            }
+        });
+        
+        fileInput.addEventListener('change', async (e) => {
+            if (e.target.files.length) {
+                await handleVideoFile(e.target.files[0]);
+            }
+        });
+
+        enterRoom.addEventListener('click', (e)=>{
+            if(video_size===null||video_name===null||video_hash==null){
+                alert('请选择视频文件');
+                return;
+            }
+            if(!roomId.value){
+                alert('请输入房间号')
+                return
+            }
+            if(!roomPwd.value){
+                alert('请输入房间密码')
+                return
+            }
+            if(!roomSrv.value){
+                alert('请输入同步服务器地址，格式：ip:port')
+                return
+            }
+            room_id = roomId.value.trim()
+            room_pwd = roomPwd.value
+            room_srv = roomSrv.value.trim()
+
+            enterTheRoom(room_id, room_pwd, video_hash, 'ws://'+room_srv);
+        })
+
+</script>
+</html>
