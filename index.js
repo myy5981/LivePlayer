@@ -223,15 +223,15 @@ function initPlayer(time,rate,running){
         }))
     })
 
-    if(time){
+    if(time!==undefined&&time!==0){
         eventMark.seeked=true
         dp.seek(time)
     }
-    if(rate){
+    if(rate!==undefined&&rate!==1){
         eventMark.ratechange=true
         dp.speed(rate)
     }
-    if(running){
+    if(running!==undefined&&running){
         eventMark.play=true
         dp.play()
     }
