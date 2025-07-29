@@ -5,6 +5,8 @@ const enterRoom = document.getElementById('enter-btn');
 const roomId = document.getElementById('room-id');
 const roomPwd = document.getElementById('room-pwd');
 const roomSrv = document.getElementById('room-srv');
+const userId = document.getElementById('user-id');
+const userKey = document.getElementById('user-token');
 
 let dp=null
 let ws=null
@@ -16,16 +18,27 @@ let video_url=null
 let room_id=null
 let room_pwd=null
 let room_srv=null
+let user_id=null
+let user_key=null
+let danmaku_list=null
 
 window.onload = function(){
     const urlParams = new URLSearchParams(window.location.search);
     const romId = urlParams.get('id');
     const romPwd = urlParams.get('pwd');
     const romSrv = urlParams.get('srv');
+    const uId = urlParams.get('user');
+    const uKey = urlParams.get('key')
 
     if (romId && roomId) roomId.value = romId;
     if (romPwd && roomPwd) roomPwd.value = romPwd;
     if (romSrv && roomSrv) roomSrv.value = romSrv;
+    if (uKey && userKey) userKey.value = uKey;
+    if (uId && userId){
+        userId.value = uId;
+    }else{
+        userId.value = `用户${Math.floor(100000 + Math.random() * 900000).toString()}`
+    }
 }
 
 function getFileHashBeforeSplit(file, chunkSize = 2 * 1024 * 1024, onProgress) {
@@ -104,8 +117,129 @@ const eventMark = {
     danmaku_send: false
 }
 
+/*
+options: {
+            url: this.options.api.address + 'v3/',
+            data: danmakuData,
+            success: callback,
+            error: (msg) => {
+                this.options.error(msg || this.options.tran('danmaku-failed'));
+            },
+        }
+ */
+
+function onDanmakuSend(options){
+    ws.send(JSON.stringify({
+        type:'ctl',
+        action:'danmaku_send',
+        ts:Date.now(),
+        data:{
+            author:options.data.author,
+            text:options.data.text,
+            color:options.data.color,
+            type:options.data.type,
+            time:options.data.time
+        }
+    }))
+    options.success && options.success();
+}
+
+function onDanmakuRead(options){
+    options.success && options.success(danmaku_list)
+}
+
+function initPlayer(time,rate,running){
+    //显示播放器窗口
+    dp = new DPlayer({
+        container: document.getElementById('video-container'),
+        video: {
+            url: video_url
+        },
+        danmaku: {
+            id: video_hash,
+            maximum: 1000,
+            user: user_id,
+            bottom: '15%',
+            unlimited: true
+        },
+        apiBackend: {
+            read: onDanmakuRead,
+            send: onDanmakuSend
+        },
+        playbackSpeed: [0.5,1,1.5,2,3],
+        screenshot: true
+    })
+
+    dp.on('pause',(e)=>{
+        if(eventMark.pause){
+            eventMark.pause=false
+            return
+        }
+        ws.send(JSON.stringify({
+            type:'ctl',
+            action:'pause',
+            time:dp.video.currentTime,
+            ts:Date.now()
+        }))
+    })
+
+    dp.on('play',(e)=>{
+        if(eventMark.play){
+            eventMark.play=false
+            return
+        }
+        ws.send(JSON.stringify({
+            type:'ctl',
+            action:'play',
+            time:dp.video.currentTime,
+            ts:Date.now()
+        }))
+    })
+
+    dp.on('ratechange',(e)=>{
+        if(eventMark.ratechange){
+            eventMark.ratechange=false
+            return
+        }
+        ws.send(JSON.stringify({
+            type:'ctl',
+            action:'ratechange',
+            time:dp.video.currentTime,
+            rate:dp.video.playbackRate,
+            ts:Date.now()
+        }))
+    })
+
+    dp.on('seeked',(e)=>{
+        if(eventMark.seeked){
+            eventMark.seeked=false
+            return
+        }
+        ws.send(JSON.stringify({
+            type:'ctl',
+            action:'seeked',
+            time:dp.video.currentTime,
+            ts:Date.now()
+        }))
+    })
+
+    if(time){
+        eventMark.seeked=true
+        dp.seek(time)
+    }
+    if(rate){
+        eventMark.ratechange=true
+        dp.speed(rate)
+    }
+    if(running){
+        eventMark.play=true
+        dp.play()
+    }
+}
+
 function handleWsMessage(msg){
     let data = JSON.parse(msg.data)
+    console.log(data)
     if(data.type === 'ctl') {
         if(data.action === 'play'){
             eventMark.play=true
@@ -120,16 +254,27 @@ function handleWsMessage(msg){
             eventMark.seeked=true
             dp.seek(data.time)
         }else if(data.action === 'danmaku_send'){
-            eventMark.danmaku_send=true
-            dp.danmaku.send({
-                text:data.text,
-                color:data.color,
-                type:data.loc
-            })
+            //待完成：实时绘制弹幕，但不调用send
+            dp.danmaku.dan.splice(dp.danmaku.danIndex, 0, data.data);
+            dp.danmaku.danIndex++;
+            const danmaku = {
+                text: dp.danmaku.htmlEncode(data.data.text),
+                color: data.data.color,
+                type: data.data.type,
+                border: `2px solid ${dp.danmaku.options.borderColor}`,
+            };
+            dp.danmaku.draw(danmaku);
         }
     }else if(data.type === "status") {
-        console.log(data.msg)
-        if(!data.msg.startsWith('OK')){
+        if(data.code === 0){
+            // 从响应中读取数据
+            danmaku_list = data.danmakus
+            // 启动
+            initPlayer(data.time,data.rate,data.running)
+        }else if(data.code === 4){
+            danmaku_list = []
+            initPlayer()
+        }else {
             alert(data.msg)
         }
     }
@@ -146,94 +291,13 @@ function enterTheRoom(id,pwd,hash,ws_url) {
     }
     ws.onopen = ()=>{
         ws.send(JSON.stringify({
-            'type':'auth',
-            'room_id':id,
-            'room_pwd':pwd,
-            'hash':hash
+            type:'auth',
+            room_id:id,
+            room_pwd:pwd,
+            hash:hash,
+            user:user_id,
+            key:user_key
         }))
     }
     ws.onmessage = handleWsMessage;
-    //显示播放器窗口
-    dp = new DPlayer({
-        container: document.getElementById('video-container'),
-        video: {
-            url: video_url
-        },
-        danmaku: {
-            id: hash,
-            api: '/danmaku_api/',
-            token: 'demo',
-            maximum: 1000,
-            user: '游客',
-            bottom: '15%',
-            unlimited: true
-        },
-        playbackSpeed: [0.5,1,1.5,2,3],
-        screenshot: true
-    })
-
-    dp.on('pause',(e)=>{
-        if(eventMark.pause){
-            eventMark.pause=false
-            return
-        }
-        ws.send(JSON.stringify({
-            'type':'ctl',
-            'action':'pause',
-            'ts':Date.now()
-        }))
-    })
-
-    dp.on('play',(e)=>{
-        if(eventMark.play){
-            eventMark.play=false
-            return
-        }
-        ws.send(JSON.stringify({
-            'type':'ctl',
-            'action':'play',
-            'ts':Date.now()
-        }))
-    })
-
-    dp.on('ratechange',(e)=>{
-        if(eventMark.ratechange){
-            eventMark.ratechange=false
-            return
-        }
-        ws.send(JSON.stringify({
-            'type':'ctl',
-            'action':'ratechange',
-            'ts':Date.now(),
-            'rate':dp.video.playbackRate
-        }))
-    })
-
-    dp.on('seeked',(e)=>{
-        if(eventMark.seeked){
-            eventMark.seeked=false
-            return
-        }
-        ws.send(JSON.stringify({
-            'type':'ctl',
-            'action':'seeked',
-            'ts':Date.now(),
-            'time':dp.video.currentTime
-        }))
-    })
-
-    dp.on('danmaku_send',(e)=>{
-        if(eventMark.danmaku_send){
-            eventMark.danmaku_send=false
-            return
-        }
-        ws.send(JSON.stringify({
-            'type':'ctl',
-            'action':'danmaku_send',
-            'ts':Date.now(),
-            'text':e.text,
-            'color':e.color,
-            'loc':e.type
-        }))
-    })
 }

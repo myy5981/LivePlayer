@@ -15,6 +15,10 @@
             <input style="margin-right: 10px;margin-left: 10px;" class="input-box" type="password" name="room-pwd" id="room-pwd" placeholder="房间密码"/>
             <input style="margin-left: 10px;" class="input-box" type="text" name="room_srv" id="room-srv" placeholder="同步服务器地址（ip:port）"/>
         </div>
+        <div style="margin-top: 0;">
+            <input style="margin-right: 10px;max-width: 385px;width: 45%;" class="input-box" type="text" name="user-id" id="user-id" placeholder="君の名前"/>
+            <input style="margin-left: 10px;max-width: 385px;width: 45%;" class="input-box" type="text" name="user-token" id="user-token" placeholder="Token"/>
+        </div>
         <div>
             <div id="file-upload-area">
                 <div id="file-upload">
@@ -89,6 +93,12 @@
                 alert('请输入同步服务器地址，格式：ip:port')
                 return
             }
+            if(!userId.value){
+                alert('请输入你的名字')
+                return
+            }
+            user_id = userId.value.trim()
+            user_key = userKey.value.trim()
             room_id = roomId.value.trim()
             room_pwd = roomPwd.value
             room_srv = roomSrv.value.trim()
